@@ -1,0 +1,78 @@
+{
+  "name": "Contract Intelligence Platform",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/dotnet:1": {
+      "version": "8.0"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
+  },
+  "forwardPorts": [
+    4200,
+    5000,
+    8000,
+    7080,
+    9000,
+    9001,
+    8025,
+    9200
+  ],
+  "portsAttributes": {
+    "4200": {
+      "label": "Frontend (Angular)",
+      "onAutoForward": "openBrowser"
+    },
+    "5000": {
+      "label": "Backend API",
+      "onAutoForward": "silent"
+    },
+    "8000": {
+      "label": "AI Service",
+      "onAutoForward": "silent"
+    },
+    "7080": {
+      "label": "Hangfire Dashboard",
+      "onAutoForward": "silent"
+    },
+    "9000": {
+      "label": "MinIO Storage",
+      "onAutoForward": "silent"
+    },
+    "9001": {
+      "label": "MinIO Console",
+      "onAutoForward": "silent"
+    },
+    "8025": {
+      "label": "MailHog (Email Testing)",
+      "onAutoForward": "silent"
+    },
+    "9200": {
+      "label": "Elasticsearch",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && .devcontainer/setup.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-python.python",
+        "angular.ng-template",
+        "ms-vscode.vscode-typescript-next",
+        "bradlc.vscode-tailwindcss",
+        "ms-vscode.vscode-json"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "python.defaultInterpreterPath": "/usr/local/python/current/bin/python"
+      }
+    }
+  },
+  "remoteUser": "codespace"
+}

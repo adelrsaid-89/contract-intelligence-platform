@@ -1,0 +1,11 @@
+<!-- Loading indicator -->
+<div class="loading-overlay" *ngIf="isLoading">
+  <mat-progress-spinner
+    mode="indeterminate"
+    diameter="50"
+    color="primary">
+  </mat-progress-spinner>
+</div>
+
+<!-- Main app content -->
+<router-outlet></router-outlet>

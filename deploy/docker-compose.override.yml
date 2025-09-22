@@ -1,0 +1,78 @@
+# Development overrides for docker-compose
+version: '3.8'
+
+services:
+  # Development backend with hot reload
+  backend:
+    build:
+      target: development
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+    volumes:
+      - ../backend:/app
+      - /app/bin
+      - /app/obj
+    command: ["dotnet", "watch", "run", "--project", "Enova.Cip.Api"]
+
+  # Development frontend with hot reload
+  frontend:
+    build:
+      target: development
+    environment:
+      - NG_CLI_ANALYTICS=false
+    volumes:
+      - ../frontend/enova-cip-ui:/app
+      - /app/node_modules
+    ports:
+      - "4200:4200"
+    command: ["npm", "run", "start", "--", "--host", "0.0.0.0", "--port", "4200"]
+
+  # Development AI service with hot reload
+  ai:
+    build:
+      target: development
+    volumes:
+      - ../ai:/app
+    environment:
+      - PYTHONPATH=/app
+      - FASTAPI_RELOAD=true
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # Additional development tools
+  adminer:
+    image: adminer:latest
+    container_name: enova-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    networks:
+      - enova-network
+    depends_on:
+      - postgres
+
+  # Elasticsearch Head for ES management
+  elasticsearch-head:
+    image: mobz/elasticsearch-head:5
+    container_name: enova-es-head
+    ports:
+      - "9100:9100"
+    networks:
+      - enova-network
+    depends_on:
+      - elasticsearch
+
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: enova-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - enova-network
+    depends_on:
+      - redis

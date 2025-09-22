@@ -1,0 +1,32 @@
+<nav class="breadcrumb-nav" *ngIf="breadcrumbs.length > 0" aria-label="Breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item home">
+      <a routerLink="/dashboard" class="breadcrumb-link">
+        <mat-icon>home</mat-icon>
+        <span class="sr-only">Home</span>
+      </a>
+    </li>
+
+    <li
+      *ngFor="let breadcrumb of breadcrumbs; let last = last"
+      class="breadcrumb-item"
+      [class.active]="last">
+
+      <mat-icon class="breadcrumb-separator">chevron_right</mat-icon>
+
+      <ng-container *ngIf="!last && breadcrumb.url; else inactiveItem">
+        <a [routerLink]="breadcrumb.url" class="breadcrumb-link">
+          <mat-icon *ngIf="breadcrumb.icon" class="breadcrumb-icon">{{ breadcrumb.icon }}</mat-icon>
+          <span>{{ breadcrumb.label }}</span>
+        </a>
+      </ng-container>
+
+      <ng-template #inactiveItem>
+        <span class="breadcrumb-text">
+          <mat-icon *ngIf="breadcrumb.icon" class="breadcrumb-icon">{{ breadcrumb.icon }}</mat-icon>
+          <span>{{ breadcrumb.label }}</span>
+        </span>
+      </ng-template>
+    </li>
+  </ol>
+</nav>

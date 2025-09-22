@@ -1,0 +1,37 @@
+<mat-sidenav-container class="sidenav-container" [class.is-mobile]="isHandset$ | async">
+  <!-- Sidebar -->
+  <mat-sidenav
+    #drawer
+    class="sidenav"
+    fixedInViewport
+    [attr.role]="(isHandset$ | async) ? 'dialog' : 'navigation'"
+    [mode]="(isHandset$ | async) ? 'over' : 'side'"
+    [opened]="(isHandset$ | async) === false && isSidenavOpen"
+    (closed)="onSidenavClosed()"
+    (opened)="onSidenavOpened()">
+    <app-sidebar
+      [user]="currentUser$ | async"
+      [isCollapsed]="!isSidenavOpen"
+      (menuItemClicked)="(isHandset$ | async) && drawer.close()">
+    </app-sidebar>
+  </mat-sidenav>
+
+  <!-- Main content area -->
+  <mat-sidenav-content class="main-content">
+    <!-- Top toolbar -->
+    <app-toolbar
+      [user]="currentUser$ | async"
+      [isMobile]="isHandset$ | async"
+      [isSidenavOpen]="isSidenavOpen"
+      (toggleSidenav)="toggleSidenav()">
+    </app-toolbar>
+
+    <!-- Breadcrumb navigation -->
+    <app-breadcrumb></app-breadcrumb>
+
+    <!-- Page content -->
+    <div class="content-container">
+      <router-outlet></router-outlet>
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>

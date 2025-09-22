@@ -1,0 +1,78 @@
+<nav class="sidebar-nav" [class.collapsed]="isCollapsed">
+  <!-- User profile section -->
+  <div class="user-profile" *ngIf="user">
+    <div class="user-avatar">
+      <img
+        *ngIf="user.profileImage"
+        [src]="user.profileImage"
+        [alt]="user.firstName + ' ' + user.lastName"
+        class="avatar-image">
+      <mat-icon *ngIf="!user.profileImage" class="avatar-icon">account_circle</mat-icon>
+    </div>
+    <div class="user-info" [class.hidden]="isCollapsed">
+      <div class="user-name">{{ user.firstName }} {{ user.lastName }}</div>
+      <div class="user-role">{{ user.role | titlecase }}</div>
+    </div>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- Navigation menu -->
+  <div class="nav-menu">
+    <ng-container *ngFor="let item of menuItems">
+      <!-- Menu item with children (expandable) -->
+      <div *ngIf="item.children?.length" class="nav-group">
+        <mat-expansion-panel
+          class="nav-expansion-panel"
+          [expanded]="isMenuItemExpanded(item)"
+          [disabled]="isCollapsed">
+          <mat-expansion-panel-header class="nav-header">
+            <mat-panel-title class="nav-title">
+              <mat-icon class="nav-icon">{{ item.icon }}</mat-icon>
+              <span class="nav-label" [class.hidden]="isCollapsed">{{ item.label }}</span>
+              <span class="badge" *ngIf="item.badge && !isCollapsed">{{ item.badge }}</span>
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+
+          <div class="nav-children">
+            <button
+              *ngFor="let child of item.children"
+              mat-button
+              class="nav-child-item"
+              [class.active]="isMenuItemActive(child)"
+              [disabled]="child.disabled"
+              (click)="onMenuItemClick(child)">
+              <mat-icon class="nav-child-icon">{{ child.icon }}</mat-icon>
+              <span class="nav-child-label">{{ child.label }}</span>
+              <span class="badge" *ngIf="child.badge">{{ child.badge }}</span>
+            </button>
+          </div>
+        </mat-expansion-panel>
+      </div>
+
+      <!-- Simple menu item (no children) -->
+      <button
+        *ngIf="!item.children?.length"
+        mat-button
+        class="nav-item"
+        [class.active]="isMenuItemActive(item)"
+        [disabled]="item.disabled"
+        [matTooltip]="isCollapsed ? item.label : ''"
+        matTooltipPosition="right"
+        (click)="onMenuItemClick(item)">
+        <mat-icon class="nav-icon">{{ item.icon }}</mat-icon>
+        <span class="nav-label" [class.hidden]="isCollapsed">{{ item.label }}</span>
+        <span class="badge" *ngIf="item.badge && !isCollapsed">{{ item.badge }}</span>
+      </button>
+    </ng-container>
+  </div>
+
+  <!-- Footer section -->
+  <div class="nav-footer">
+    <mat-divider></mat-divider>
+    <div class="footer-content" [class.hidden]="isCollapsed">
+      <div class="app-version">v1.0.0</div>
+      <div class="copyright">&copy; 2024 Enova CIP</div>
+    </div>
+  </div>
+</nav>

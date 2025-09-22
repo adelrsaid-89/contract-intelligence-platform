@@ -1,0 +1,292 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:15
+    container_name: enova-postgres
+    environment:
+      POSTGRES_DB: enova_cip
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - enova-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Search Engine
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: enova-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - enova-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: enova-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - enova-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Email Service (Development)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: enova-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - enova-network
+
+  # Redis (for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: enova-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - enova-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # AI Microservice
+  ai:
+    build:
+      context: ../ai
+      dockerfile: Dockerfile
+      target: production
+    container_name: enova-ai
+    environment:
+      - AI_OCR_PROVIDER=${AI_OCR_PROVIDER:-local}
+      - AI_EXTRACT_PROVIDER=${AI_EXTRACT_PROVIDER:-local}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AZURE_DOCINTEL_ENDPOINT=${AZURE_DOCINTEL_ENDPOINT:-}
+      - AZURE_DOCINTEL_KEY=${AZURE_DOCINTEL_KEY:-}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/enova_cip
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ai_models:/app/models
+      - ai_temp:/app/temp
+    networks:
+      - enova-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: enova-backend
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=enova_cip;Username=postgres;Password=postgres
+      - Elasticsearch__Uri=http://elasticsearch:9200
+      - MinIO__Endpoint=http://minio:9000
+      - MinIO__AccessKey=minioadmin
+      - MinIO__SecretKey=minioadmin
+      - Smtp__Host=mailhog
+      - Smtp__Port=1025
+      - Smtp__User=
+      - Smtp__Password=
+      - AI__BaseUrl=http://ai:8000
+      - JWT__Issuer=enova.local
+      - JWT__Audience=enova.local
+      - JWT__Key=${JWT_KEY:-SuperSecretDevKey_ChangeMe}
+      - SEED_MODE=${SEED_MODE:-example}
+      - Hangfire__Dashboard__Enabled=true
+      - Redis__ConnectionString=redis:6379
+    ports:
+      - "5000:5000"
+      - "7080:7080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
+    networks:
+      - enova-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: ../frontend/enova-cip-ui
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: enova-frontend
+    environment:
+      - API_BASE_URL=http://localhost:5000
+      - AI_BASE_URL=http://localhost:8000
+      - MINIO_BASE_URL=http://localhost:9000
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - enova-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Hangfire Server (separate for scaling)
+  hangfire:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: hangfire
+    container_name: enova-hangfire
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=enova_cip;Username=postgres;Password=postgres
+      - Elasticsearch__Uri=http://elasticsearch:9200
+      - MinIO__Endpoint=http://minio:9000
+      - MinIO__AccessKey=minioadmin
+      - MinIO__SecretKey=minioadmin
+      - Smtp__Host=mailhog
+      - Smtp__Port=1025
+      - AI__BaseUrl=http://ai:8000
+      - Redis__ConnectionString=redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - hangfire_logs:/app/logs
+    networks:
+      - enova-network
+
+  # Init Container (Database migrations and seed data)
+  init:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      target: init
+    container_name: enova-init
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=enova_cip;Username=postgres;Password=postgres
+      - Elasticsearch__Uri=http://elasticsearch:9200
+      - MinIO__Endpoint=http://minio:9000
+      - MinIO__AccessKey=minioadmin
+      - MinIO__SecretKey=minioadmin
+      - AI__BaseUrl=http://ai:8000
+      - SEED_MODE=${SEED_MODE:-example}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+    volumes:
+      - ../seed:/app/seed
+    networks:
+      - enova-network
+    restart: "no"
+
+volumes:
+  postgres_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  minio_data:
+    driver: local
+  redis_data:
+    driver: local
+  ai_models:
+    driver: local
+  ai_temp:
+    driver: local
+  backend_logs:
+    driver: local
+  backend_uploads:
+    driver: local
+  hangfire_logs:
+    driver: local
+
+networks:
+  enova-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
